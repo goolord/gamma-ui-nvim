@@ -262,7 +262,7 @@ function M.layout_element.group (el, opts, state)
     end
 end
 
-local function layout(opts, state)
+function M.layout(opts, state)
     -- this is my way of hacking pattern matching
     -- you index the table by its "type"
     local hl = {}
@@ -389,7 +389,7 @@ function M.register_ui(name, state)
             local ix = state.cursor_ix
             vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
             vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
-            layout(opts, state)
+            M.layout(opts, state)
             vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
             vim.api.nvim_buf_set_keymap(
                 state.buffer,
