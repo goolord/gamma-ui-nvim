@@ -8,18 +8,9 @@ local str_rep = string.rep
 local list_extend = vim.list_extend
 local concat = table.concat
 
-local cursor_ix = 1
-local cursor_jumps = {}
-local cursor_jumps_press = {}
-
 local function noop () end
 
-_G.alpha_ui_redraw = noop
-_G.alpha_ui_close = noop
-
-function _G.alpha_ui_press()
-    cursor_jumps_press[cursor_ix]()
-end
+_G.alpha_ui = {}
 
 function M.longest_line(tbl)
     local longest = 0
@@ -32,17 +23,17 @@ function M.longest_line(tbl)
     return longest
 end
 
-local function spaces(n)
+function M.spaces(n)
     return str_rep(" ", n)
 end
 
-local function center(tbl, state)
+function M.center(tbl, state)
     -- longest line used to calculate the center.
     -- which doesn't quite give a 'justfieid' look, but w.e
     local longest = M.longest_line(tbl)
     -- div 2
     local left = bit.arshift(state.win_width - longest, 1)
-    local padding = spaces(left)
+    local padding = M.spaces(left)
     local centered = {}
     for k, v in ipairs(tbl) do
         centered[k] = padding .. v
@@ -50,7 +41,7 @@ local function center(tbl, state)
     return centered, left
 end
 
-local function pad_margin(tbl, state, margin, shrink)
+function M.pad_pargin(tbl, state, margin, shrink)
     local longest = M.longest_line(tbl)
     local left
     if shrink then
@@ -62,7 +53,7 @@ local function pad_margin(tbl, state, margin, shrink)
     else
         left = margin
     end
-    local padding = spaces(left)
+    local padding = M.spaces(left)
     local padded = {}
     for k, v in ipairs(tbl) do
         padded[k] = padding .. v .. padding
@@ -79,7 +70,7 @@ end
 --     return trimmed
 -- end
 
-local function highlight(state, end_ln, hl, left)
+function M.highlight(state, end_ln, hl, left)
     local hl_type = type(hl)
     local hl_tbl = {}
     if hl_type == "string" then
@@ -103,15 +94,15 @@ local function highlight(state, end_ln, hl, left)
     return hl_tbl
 end
 
-local layout_element = {}
+M.layout_element = {}
 
-local function resolve(to, el, opts, state)
+function M.resolve(to, el, opts, state)
     local new_el = deepcopy(el)
     new_el.val = el.val()
     return to(new_el, opts, state)
 end
 
-function layout_element.text (el, opts, state)
+function M.layout_element.text (el, opts, state)
     if type(el.val) == "table" then
         local end_ln = state.line + #el.val
         local val = el.val
@@ -119,19 +110,19 @@ function layout_element.text (el, opts, state)
         local padding = { left = 0 }
         if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
             local left
-            val, left = pad_margin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+            val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
             padding.left = padding.left + left
         end
         if el.opts then
             if el.opts.position == "center" then
-                val, _ = center(val, state)
+                val, _ = M.center(val, state)
             end
         -- if el.opts.wrap == "overflow" then
         --     val = trim(val, state)
         -- end
         end
         if el.opts and el.opts.hl then
-            hl = highlight(state, end_ln, el.opts.hl, 0)
+            hl = M.highlight(state, end_ln, el.opts.hl, 0)
         end
         state.line = end_ln
         return val, hl
@@ -146,26 +137,26 @@ function layout_element.text (el, opts, state)
         local padding = { left = 0 }
         if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
             local left
-            val, left = pad_margin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+            val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
             padding.left = padding.left + left
         end
         if el.opts then
             if el.opts.position == "center" then
-                val, _ = center(val, state)
+                val, _ = M.center(val, state)
             end
         end
         local end_ln = state.line + 1
         if el.opts and el.opts.hl then
-            hl = highlight(state, end_ln, el.opts.hl, padding.left)
+            hl = M.highlight(state, end_ln, el.opts.hl, padding.left)
         end
         state.line = end_ln
         return val, hl
     end
 
-    if type(el.val) == "function" then return resolve(layout_element.text, el, opts, state) end
+    if type(el.val) == "function" then return M.resolve(M.layout_element.text, el, opts, state) end
 end
 
-function layout_element.padding (el, opts, state)
+function M.layout_element.padding (el, opts, state)
     local lines = 0
     if type(el.val) == "function" then lines = el.val() end
     if type(el.val) == "number" then lines = el.val end
@@ -178,7 +169,7 @@ function layout_element.padding (el, opts, state)
     return val, {}
 end
 
-function layout_element.button (el, opts, state)
+function M.layout_element.button (el, opts, state)
     local val = {}
     local hl = {}
     local padding = {
@@ -196,8 +187,8 @@ function layout_element.button (el, opts, state)
             end
         end
         if el.opts.align_shortcut == "right"
-            then val = { concat { el.val, spaces(padding.center), el.opts.shortcut } }
-            else val = { concat { el.opts.shortcut, el.val, spaces(padding.right) } }
+            then val = { concat { el.val, M.spaces(padding.center), el.opts.shortcut } }
+            else val = { concat { el.opts.shortcut, el.val, M.spaces(padding.right) } }
         end
     else
         val = {el.val}
@@ -206,7 +197,7 @@ function layout_element.button (el, opts, state)
     -- margin
     if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
         local left
-        val, left = pad_margin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+        val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
         if el.opts.align_shortcut == "right"
             then padding.center = padding.center + left
             else padding.left = padding.left + left
@@ -217,7 +208,7 @@ function layout_element.button (el, opts, state)
     if el.opts then
         if el.opts.position == "center" then
             local left
-            val, left = center(val, state)
+            val, left = M.center(val, state)
             if el.opts.align_shortcut == "right" then
               padding.center = padding.center + left
             end
@@ -228,41 +219,41 @@ function layout_element.button (el, opts, state)
     local row = state.line + 1
     local _, count_spaces = string.find(val[1], "%s*")
     local col = ((el.opts and el.opts.cursor) or 0) + count_spaces
-    cursor_jumps[#cursor_jumps+1] = {row, col}
-    cursor_jumps_press[#cursor_jumps_press+1] = el.on_press
+    state.cursor_jumps[#state.cursor_jumps+1] = {row, col}
+    state.cursor_jumps_press[#state.cursor_jumps_press+1] = el.on_press
     if el.opts and el.opts.hl_shortcut then
         if type(el.opts.hl_shortcut) == "string"
             then hl = {{el.opts.hl_shortcut, 0, #el.opts.shortcut}}
             else hl = el.opts.hl_shortcut
         end
         if el.opts.align_shortcut == "right"
-            then hl = highlight(state, state.line, hl, #el.val + padding.center)
-            else hl = highlight(state, state.line, hl, padding.left)
+            then hl = M.highlight(state, state.line, hl, #el.val + padding.center)
+            else hl = M.highlight(state, state.line, hl, padding.left)
         end
     end
 
     if el.opts and el.opts.hl then
         local left = padding.left
         if el.opts.align_shortcut == "left" then left = left + #el.opts.shortcut + 2 end
-        list_extend(hl, highlight(state, state.line, el.opts.hl, left))
+        list_extend(hl, M.highlight(state, state.line, el.opts.hl, left))
     end
     state.line = state.line + 1
     return val, hl
 end
 
-function layout_element.group (el, opts, state)
-    if type(el.val) == "function" then return resolve(layout_element.group, el, opts, state) end
+function M.layout_element.group (el, opts, state)
+    if type(el.val) == "function" then return M.resolve(M.layout_element.group, el, opts, state) end
 
     if type(el.val) == "table" then
         local text_tbl = {}
         local hl_tbl = {}
         for _, v in ipairs(el.val) do
-            local text, hl = layout_element[v.type](v, opts, state)
+            local text, hl = M.layout_element[v.type](v, opts, state)
             if text then list_extend(text_tbl, text) end
             if hl then list_extend(hl_tbl, hl) end
             if el.opts and el.opts.spacing then
                 local padding_el = {type = "padding", val = el.opts.spacing}
-                local text_1, hl_1 = layout_element[padding_el.type](padding_el, opts, state)
+                local text_1, hl_1 = M.layout_element[padding_el.type](padding_el, opts, state)
                 list_extend(text_tbl, text_1)
                 list_extend(hl_tbl, hl_1)
             end
@@ -277,7 +268,7 @@ local function layout(opts, state)
     local hl = {}
     local text = {}
     for _, el in ipairs(opts.layout) do
-        local text_el, hl_el = layout_element[el.type](el, opts, state)
+        local text_el, hl_el = M.layout_element[el.type](el, opts, state)
         list_extend(text, text_el)
         list_extend(hl, hl_el)
     end
@@ -300,7 +291,7 @@ function M.keymaps_element.button (el, opts, state)
 end
 
 function M.keymaps_element.group (el, opts, state)
-    if type(el.val) == "function" then resolve(M.keymaps_element.group, el, opts, state) end
+    if type(el.val) == "function" then M.resolve(M.keymaps_element.group, el, opts, state) end
 
     if type(el.val) == "table" then
         for _, v in ipairs(el.val) do
@@ -316,7 +307,7 @@ function M.keymaps(opts, state)
 end
 
 -- dragons
-local function closest_cursor_jump(cursor, cursors, prev_cursor)
+function M.closest_cursor_jump(cursor, cursors, prev_cursor)
     local direction = prev_cursor[1] > cursor[1] -- true = UP, false = DOWN
     -- minimum distance key from jump point
     -- excluding jumps in opposite direction
@@ -349,81 +340,74 @@ local function closest_cursor_jump(cursor, cursors, prev_cursor)
     end
 end
 
-function M.enable_alpha_ui_ui(setup, opts)
-    setup()
-    -- vim.opt_local behaves inconsistently for window options, it seems.
-    -- I don't have the patience to sort out a better way to do this
-    -- or seperate out the buffer local options.
-    vim.cmd [[
-        silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile nowrap
+function M.register_ui(name, state)
+    local cursor_ix = 1
+    local cursor_jumps = {}
+    local cursor_jumps_press = {}
+    local options
 
-        augroup alpha_ui_temp
-        au!
-        autocmd BufUnload <buffer> call v:lua.alpha_ui_close()
-        autocmd CursorMoved <buffer> call v:lua.alpha_ui_set_cursor()
-        augroup END
-    ]]
+    local ui_mod = {
+        set_cursor = function ()
+            local cursor = vim.api.nvim_win_get_cursor(state.window)
+            local closest_ix, closest_pt = M.closest_cursor_jump(cursor, state.cursor_jumps, state.cursor_jumps[cursor_ix])
+            cursor_ix = closest_ix
+            vim.api.nvim_win_set_cursor(state.window, closest_pt)
+        end,
+        press = function () cursor_jumps_press[state.cursor_ix]() end,
+        enable = function (opts)
+            options = options or opts
+            -- vim.opt_local behaves inconsistently for window options, it seems.
+            -- I don't have the patience to sort out a better way to do this
+            -- or seperate out the buffer local options.
+            vim.cmd (string.format([[
+            silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
 
-    if opts.opts then
-        if if_nil(opts.opts.redraw_on_resize, true) then
-            vim.cmd [[
-                autocmd alpha_ui_temp VimResized * call v:lua.alpha_ui_redraw()
-                autocmd alpha_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.alpha_ui_redraw()
-            ]]
-        end
+            augroup alpha_ui_temp
+            au!
+            autocmd BufUnload <buffer> call v:lua.alpha_ui.%s.close()
+            autocmd CursorMoved <buffer> call v:lua.alpha_ui.%s.set_cursor()
+            augroup END
+            ]], name, name, name))
 
-        if opts.opts.setup then opts.opts.setup() end
-    end
-end
+            if opts.opts then
+                if if_nil(opts.opts.redraw_on_resize, true) then
+                    vim.cmd (string.format([[
+                    autocmd alpha_ui_temp VimResized * call v:lua.alpha_ui.%s.draw()
+                    autocmd alpha_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.alpha_ui.%s.draw()
+                    ]], name, name))
+                end
 
-M.options = nil
-
-function M.alpha_ui_set_cursor_win (window)
-    local cursor = vim.api.nvim_win_get_cursor(window)
-    local closest_ix, closest_pt = closest_cursor_jump(cursor, cursor_jumps, cursor_jumps[cursor_ix])
-    cursor_ix = closest_ix
-    vim.api.nvim_win_set_cursor(window, closest_pt)
-end
-
-
-function M.draw(opts, state)
-    for k in ipairs(cursor_jumps) do cursor_jumps[k] = nil end
-    for k in ipairs(cursor_jumps_press) do cursor_jumps_press[k] = nil end
-    state.win_width = vim.api.nvim_win_get_width(state.window)
-    state.line = 0
-    -- this is for redraws. i guess the cursor 'moves'
-    -- when the screen is cleared and then redrawn
-    -- so we save the index before that happens
-    local ix = cursor_ix
-    vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
-    vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
-    layout(opts, state)
-    vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
-    vim.api.nvim_buf_set_keymap(
-        state.buffer,
-        "n",
-        "<CR>",
-        ":call v:lua.alpha_ui_press()<CR>",
-        {noremap = false, silent = true}
-    )
-    vim.api.nvim_win_set_cursor(state.window, cursor_jumps[ix])
-end
-
-_G.alpha_ui_redraw = M.draw
-
-function _G.alpha_ui_close ()
-    cursor_ix = 1
-    cursor_jumps = {}
-    cursor_jumps_press = {}
-    _G.alpha_ui_redraw = noop
-    vim.cmd[[au! alpha_ui_temp]]
-end
-
-function M.setup(setup, opts)
-    setup()
-    if type(opts) == "table" then
-        M.options = opts
-    end
+                if opts.opts.setup then opts.opts.setup() end
+            end
+        end,
+        draw = function (opts)
+            opts = opts or options
+            for k in ipairs(cursor_jumps) do cursor_jumps[k] = nil end
+            for k in ipairs(cursor_jumps_press) do cursor_jumps_press[k] = nil end
+            state.win_width = vim.api.nvim_win_get_width(state.window)
+            state.line = 0
+            -- this is for redraws. i guess the cursor 'moves'
+            -- when the screen is cleared and then redrawn
+            -- so we save the index before that happens
+            local ix = cursor_ix
+            vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
+            vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
+            layout(opts, state)
+            vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
+            vim.api.nvim_buf_set_keymap(
+                state.buffer,
+                "n",
+                "<CR>",
+                string.format(":call v:lua.alpha_ui.%s.press()<CR>", name),
+                {noremap = false, silent = true}
+            )
+            vim.api.nvim_win_set_cursor(state.window, state.cursor_jumps[ix])
+        end,
+        close = function ()
+            vim.cmd[[au! alpha_ui_temp]]
+        end,
+    }
+    _G.alpha_ui[name] = ui_mod
 end
 
 return M
