@@ -1,1 +1,1 @@
-# alpha-ui-nvim
+# gamma-ui-nvim
