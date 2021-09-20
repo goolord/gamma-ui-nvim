@@ -341,19 +341,16 @@ function M.closest_cursor_jump(cursor, cursors, prev_cursor)
 end
 
 function M.register_ui(name, state)
-    local cursor_ix = 1
-    local cursor_jumps = {}
-    local cursor_jumps_press = {}
     local options
 
     local ui_mod = {
         set_cursor = function ()
             local cursor = vim.api.nvim_win_get_cursor(state.window)
-            local closest_ix, closest_pt = M.closest_cursor_jump(cursor, state.cursor_jumps, state.cursor_jumps[cursor_ix])
-            cursor_ix = closest_ix
+            local closest_ix, closest_pt = M.closest_cursor_jump(cursor, state.cursor_jumps, state.cursor_jumps[state.cursor_ix])
+            state.cursor_ix = closest_ix
             vim.api.nvim_win_set_cursor(state.window, closest_pt)
         end,
-        press = function () cursor_jumps_press[state.cursor_ix]() end,
+        press = function () state.cursor_jumps_press[state.cursor_ix]() end,
         enable = function (opts)
             options = options or opts
             -- vim.opt_local behaves inconsistently for window options, it seems.
@@ -382,14 +379,14 @@ function M.register_ui(name, state)
         end,
         draw = function (opts)
             opts = opts or options
-            for k in ipairs(cursor_jumps) do cursor_jumps[k] = nil end
-            for k in ipairs(cursor_jumps_press) do cursor_jumps_press[k] = nil end
+            for k in ipairs(state.cursor_jumps) do state.cursor_jumps[k] = nil end
+            for k in ipairs(state.cursor_jumps_press) do state.cursor_jumps_press[k] = nil end
             state.win_width = vim.api.nvim_win_get_width(state.window)
             state.line = 0
             -- this is for redraws. i guess the cursor 'moves'
             -- when the screen is cleared and then redrawn
             -- so we save the index before that happens
-            local ix = cursor_ix
+            local ix = state.cursor_ix
             vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
             vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
             layout(opts, state)
@@ -405,6 +402,7 @@ function M.register_ui(name, state)
         end,
         close = function ()
             vim.cmd[[au! alpha_ui_temp]]
+            _G.alpha_ui[name] = nil
         end,
     }
     _G.alpha_ui[name] = ui_mod
