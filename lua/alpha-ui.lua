@@ -274,7 +274,7 @@ local function layout(opts, state)
     end
     vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, text)
     for _, hl_line in ipairs(hl) do
-        vim.api.nvim_buf_add_highlight(hl_line[1],hl_line[2],hl_line[3],hl_line[4],hl_line[5],hl_line[6])
+        pcall(vim.api.nvim_buf_add_highlight(hl_line[1],hl_line[2],hl_line[3],hl_line[4],hl_line[5],hl_line[6]))
     end
 end
 
