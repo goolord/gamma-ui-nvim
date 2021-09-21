@@ -61,15 +61,6 @@ function M.pad_pargin(tbl, state, margin, shrink)
     return padded, left
 end
 
--- function trim(tbl, state)
---     local win_width = vim.api.nvim_win_get_width(state.window)
---     local trimmed = {}
---     for k,v in ipairs(tbl) do
---         trimmed[k] = string.sub(v, 1, win_width)
---     end
---     return trimmed
--- end
-
 function M.highlight(state, end_ln, hl, left)
     local hl_type = type(hl)
     local hl_tbl = {}
