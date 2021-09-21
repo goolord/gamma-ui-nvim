@@ -340,71 +340,78 @@ function M.closest_cursor_jump(cursor, cursors, prev_cursor)
     end
 end
 
+local function draw(name, opts, options, state)
+    opts = opts or options
+    for k in ipairs(state.cursor_jumps) do state.cursor_jumps[k] = nil end
+    for k in ipairs(state.cursor_jumps_press) do state.cursor_jumps_press[k] = nil end
+    state.win_width = vim.api.nvim_win_get_width(state.window)
+    state.line = 0
+    -- this is for redraws. i guess the cursor 'moves'
+    -- when the screen is cleared and then redrawn
+    -- so we save the index before that happens
+    local ix = state.cursor_ix
+    vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
+    vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
+    M.layout(opts, state)
+    vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
+    vim.api.nvim_buf_set_keymap(
+    state.buffer,
+    "n",
+    "<CR>",
+    string.format(":call v:lua.alpha_ui.%s.press()<CR>", name),
+    {noremap = false, silent = true}
+    )
+    vim.api.nvim_win_set_cursor(state.window, state.cursor_jumps[ix])
+end
+
+local function enable(name, opts)
+    -- vim.opt_local behaves inconsistently for window options, it seems.
+    -- I don't have the patience to sort out a better way to do this
+    -- or seperate out the buffer local options.
+    vim.cmd (string.format([[
+    silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
+
+    augroup alpha_ui_temp
+    au!
+    autocmd BufUnload <buffer> call v:lua.alpha_ui.%s.close()
+    autocmd CursorMoved <buffer> call v:lua.alpha_ui.%s.set_cursor()
+    augroup END
+    ]], name, name, name))
+
+    if opts.opts then
+        if if_nil(opts.opts.redraw_on_resize, true) then
+            vim.cmd (string.format([[
+            autocmd alpha_ui_temp VimResized * call v:lua.alpha_ui.%s.draw()
+            autocmd alpha_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.alpha_ui.%s.draw()
+            ]], name, name))
+        end
+
+        if opts.opts.setup then opts.opts.setup() end
+    end
+end
+
+local function set_cursor(state)
+    local cursor = vim.api.nvim_win_get_cursor(state.window)
+    local closest_ix, closest_pt = M.closest_cursor_jump(cursor, state.cursor_jumps, state.cursor_jumps[state.cursor_ix])
+    state.cursor_ix = closest_ix
+    vim.api.nvim_win_set_cursor(state.window, closest_pt)
+end
+
 function M.register_ui(name, state)
     local options
 
-    local ui_mod = {
-        set_cursor = function ()
-            local cursor = vim.api.nvim_win_get_cursor(state.window)
-            local closest_ix, closest_pt = M.closest_cursor_jump(cursor, state.cursor_jumps, state.cursor_jumps[state.cursor_ix])
-            state.cursor_ix = closest_ix
-            vim.api.nvim_win_set_cursor(state.window, closest_pt)
-        end,
-        press = function () state.cursor_jumps_press[state.cursor_ix]() end,
-        enable = function (opts)
-            options = options or opts
-            -- vim.opt_local behaves inconsistently for window options, it seems.
-            -- I don't have the patience to sort out a better way to do this
-            -- or seperate out the buffer local options.
-            vim.cmd (string.format([[
-            silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
-
-            augroup alpha_ui_temp
-            au!
-            autocmd BufUnload <buffer> call v:lua.alpha_ui.%s.close()
-            autocmd CursorMoved <buffer> call v:lua.alpha_ui.%s.set_cursor()
-            augroup END
-            ]], name, name, name))
-
-            if opts.opts then
-                if if_nil(opts.opts.redraw_on_resize, true) then
-                    vim.cmd (string.format([[
-                    autocmd alpha_ui_temp VimResized * call v:lua.alpha_ui.%s.draw()
-                    autocmd alpha_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.alpha_ui.%s.draw()
-                    ]], name, name))
-                end
-
-                if opts.opts.setup then opts.opts.setup() end
-            end
-        end,
-        draw = function (opts)
-            opts = opts or options
-            for k in ipairs(state.cursor_jumps) do state.cursor_jumps[k] = nil end
-            for k in ipairs(state.cursor_jumps_press) do state.cursor_jumps_press[k] = nil end
-            state.win_width = vim.api.nvim_win_get_width(state.window)
-            state.line = 0
-            -- this is for redraws. i guess the cursor 'moves'
-            -- when the screen is cleared and then redrawn
-            -- so we save the index before that happens
-            local ix = state.cursor_ix
-            vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
-            vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
-            M.layout(opts, state)
-            vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
-            vim.api.nvim_buf_set_keymap(
-                state.buffer,
-                "n",
-                "<CR>",
-                string.format(":call v:lua.alpha_ui.%s.press()<CR>", name),
-                {noremap = false, silent = true}
-            )
-            vim.api.nvim_win_set_cursor(state.window, state.cursor_jumps[ix])
-        end,
-        close = function ()
-            vim.cmd[[au! alpha_ui_temp]]
-            _G.alpha_ui[name] = nil
-        end,
-    }
+    local ui_mod = {}
+    ui_mod.set_cursor = function () set_cursor(state) end
+    ui_mod.press = function () state.cursor_jumps_press[state.cursor_ix]() end
+    ui_mod.enable = function (opts)
+        options = options or opts
+        enable(name, opts)
+    end
+    ui_mod.draw = function (opts) draw(name, opts, options, state) end
+    ui_mod.close = function ()
+        vim.cmd[[au! alpha_ui_temp]]
+        _G.alpha_ui[name] = nil
+    end
     _G.alpha_ui[name] = ui_mod
 end
 
