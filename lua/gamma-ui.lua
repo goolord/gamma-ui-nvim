@@ -331,8 +331,8 @@ function M.closest_cursor_jump(cursor, cursors, prev_cursor)
     end
 end
 
-local function draw(name, opts, options, state)
-    opts = opts or options
+local function draw(name, opts, def_opts, state)
+    opts = opts or def_opts
     for k in ipairs(state.cursor_jumps) do state.cursor_jumps[k] = nil end
     for k in ipairs(state.cursor_jumps_press) do state.cursor_jumps_press[k] = nil end
     state.win_width = vim.api.nvim_win_get_width(state.window)
