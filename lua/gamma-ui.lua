@@ -10,7 +10,7 @@ local concat = table.concat
 
 local function noop () end
 
-_G.alpha_ui = {}
+_G.gamma_ui = {}
 
 function M.longest_line(tbl)
     local longest = 0
@@ -349,7 +349,7 @@ local function draw(name, opts, def_opts, state)
     state.buffer,
     "n",
     "<CR>",
-    string.format(":call v:lua.alpha_ui.%s.press()<CR>", name),
+    string.format(":call v:lua.gamma_ui.%s.press()<CR>", name),
     {noremap = false, silent = true}
     )
     vim.api.nvim_win_set_cursor(state.window, state.cursor_jumps[ix])
@@ -362,18 +362,18 @@ local function enable(name, opts)
     vim.cmd (string.format([[
     silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
 
-    augroup alpha_ui_temp
+    augroup gamma_ui_temp
     au!
-    autocmd BufUnload <buffer> call v:lua.alpha_ui.%s.close()
-    autocmd CursorMoved <buffer> call v:lua.alpha_ui.%s.set_cursor()
+    autocmd BufUnload <buffer> call v:lua.gamma_ui.%s.close()
+    autocmd CursorMoved <buffer> call v:lua.gamma_ui.%s.set_cursor()
     augroup END
     ]], name, name, name))
 
     if opts.opts then
         if if_nil(opts.opts.redraw_on_resize, true) then
             vim.cmd (string.format([[
-            autocmd alpha_ui_temp VimResized * call v:lua.alpha_ui.%s.draw()
-            autocmd alpha_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.alpha_ui.%s.draw()
+            autocmd gamma_ui_temp VimResized * call v:lua.gamma_ui.%s.draw()
+            autocmd gamma_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.gamma_ui.%s.draw()
             ]], name, name))
         end
 
@@ -400,10 +400,10 @@ function M.register_ui(name, state)
     end
     ui_mod.draw = function (opts) draw(name, opts, options, state) end
     ui_mod.close = function ()
-        vim.cmd[[au! alpha_ui_temp]]
-        _G.alpha_ui[name] = nil
+        vim.cmd[[au! gamma_ui_temp]]
+        _G.gamma_ui[name] = nil
     end
-    _G.alpha_ui[name] = ui_mod
+    _G.gamma_ui[name] = ui_mod
 end
 
 return M
