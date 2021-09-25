@@ -398,7 +398,10 @@ function M.register_ui(name, state)
         options = options or opts
         enable(name, opts)
     end
-    ui_mod.draw = function (opts) draw(name, opts, options, state) end
+    ui_mod.draw = function (opts)
+        draw(name, opts, options, state)
+        M.keymaps(opts or options, state)
+    end
     ui_mod.close = function ()
         vim.cmd[[au! gamma_ui_temp]]
         _G.gamma_ui[name] = nil
