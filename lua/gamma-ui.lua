@@ -362,36 +362,32 @@ local function enable(name, conf)
 
     local augroup = name .. "_temp"
 
-    vim.api.nvim_create_augroup({ name = augroup, clear = true })
+    vim.api.nvim_create_augroup(augroup, { clear = true })
 
-    vim.api.nvim_create_autocmd {
+    vim.api.nvim_create_autocmd("BufUnload", {
         group = augroup,
-        event = "BufUnload",
         pattern = "<buffer>",
         callback = function() M[name].close() end,
-    }
+    })
 
-    vim.api.nvim_create_autocmd {
+    vim.api.nvim_create_autocmd("CursorMoved", {
         group = augroup,
-        event = "CursorMoved",
         pattern = "<buffer>",
         callback = function() M[name].set_cursor() end,
-    }
+    })
 
     if conf.opts then
         if if_nil(conf.opts.redraw_on_resize, true) then
-            vim.api.nvim_create_autocmd {
+            vim.api.nvim_create_autocmd("VimResized", {
                 group = augroup,
-                event = "VimResized",
                 pattern = "*",
                 callback = function() M[name].draw() end,
-            }
-            vim.api.nvim_create_autocmd {
+            })
+            vim.api.nvim_create_autocmd("BufLeave,WinEnter,WinNew,WinClosed", {
                 group = augroup,
-                event = "BufLeave,WinEnter,WinNew,WinClosed",
                 pattern = "*",
                 callback = function() M[name].draw() end,
-            }
+            })
         end
 
         if conf.opts.setup then conf.opts.setup() end
