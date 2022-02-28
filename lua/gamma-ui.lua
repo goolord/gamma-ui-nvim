@@ -1,12 +1,12 @@
 local M = {}
 
-local if_nil = vim.F.if_nil
-local deepcopy = vim.deepcopy
 local abs = math.abs
-local strdisplaywidth = vim.fn.strdisplaywidth
-local str_rep = string.rep
-local list_extend = vim.list_extend
 local concat = table.concat
+local deepcopy = vim.deepcopy
+local if_nil = vim.F.if_nil
+local list_extend = vim.list_extend
+local str_rep = string.rep
+local strdisplaywidth = vim.fn.strdisplaywidth
 
 local function noop () end
 
@@ -25,7 +25,7 @@ function M.spaces(n)
     return str_rep(" ", n)
 end
 
-function M.center(tbl, state)
+function M.align_center(tbl, state)
     -- longest line used to calculate the center.
     -- which doesn't quite give a 'justfieid' look, but w.e
     local longest = M.longest_line(tbl)
@@ -104,7 +104,7 @@ function M.layout_element.text (el, conf, state)
         end
         if el.opts then
             if el.opts.position == "center" then
-                val, _ = M.center(val, state)
+                val, _ = M.align_center(val, state)
             end
         -- if el.opts.wrap == "overflow" then
         --     val = trim(val, state)
@@ -131,7 +131,7 @@ function M.layout_element.text (el, conf, state)
         end
         if el.opts then
             if el.opts.position == "center" then
-                val, _ = M.center(val, state)
+                val, _ = M.align_center(val, state)
             end
         end
         local end_ln = state.line + 1
@@ -197,7 +197,7 @@ function M.layout_element.button (el, conf, state)
     if el.opts then
         if el.opts.position == "center" then
             local left
-            val, left = M.center(val, state)
+            val, left = M.align_center(val, state)
             if el.opts.align_shortcut == "right" then
               padding.center = padding.center + left
             end
@@ -356,7 +356,9 @@ local function enable(name, conf)
     -- vim.opt_local behaves inconsistently for window options, it seems.
     -- I don't have the patience to sort out a better way to do this
     -- or seperate out the buffer local options.
-    vim.cmd (string.format([[
+    local noautocmd
+    if conf.opts.noautocmd then noautocmd = "noautocmd " else noautocmd = "" end
+    vim.cmd (noautocmd .. string.format([[
     silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
     ]], name))
 
