@@ -10,8 +10,6 @@ local concat = table.concat
 
 local function noop () end
 
-_G.gamma_ui = {}
-
 function M.longest_line(tbl)
     local longest = 0
     for _, v in ipairs(tbl) do
@@ -87,21 +85,21 @@ end
 
 M.layout_element = {}
 
-function M.resolve(to, el, opts, state)
+function M.resolve(to, el, conf, state)
     local new_el = deepcopy(el)
     new_el.val = el.val()
-    return to(new_el, opts, state)
+    return to(new_el, conf, state)
 end
 
-function M.layout_element.text (el, opts, state)
+function M.layout_element.text (el, conf, state)
     if type(el.val) == "table" then
         local end_ln = state.line + #el.val
         local val = el.val
         local hl = {}
         local padding = { left = 0 }
-        if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
+        if conf.opts and conf.opts.margin and el.opts and (el.opts.position ~= "center") then
             local left
-            val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+            val, left = M.pad_pargin(val, state, conf.opts.margin, if_nil(el.opts.shrink_margin, true))
             padding.left = padding.left + left
         end
         if el.opts then
@@ -126,9 +124,9 @@ function M.layout_element.text (el, opts, state)
             val[#val+1] = s
         end
         local padding = { left = 0 }
-        if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
+        if conf.opts and conf.opts.margin and el.opts and (el.opts.position ~= "center") then
             local left
-            val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+            val, left = M.pad_pargin(val, state, conf.opts.margin, if_nil(el.opts.shrink_margin, true))
             padding.left = padding.left + left
         end
         if el.opts then
@@ -144,10 +142,10 @@ function M.layout_element.text (el, opts, state)
         return val, hl
     end
 
-    if type(el.val) == "function" then return M.resolve(M.layout_element.text, el, opts, state) end
+    if type(el.val) == "function" then return M.resolve(M.layout_element.text, el, conf, state) end
 end
 
-function M.layout_element.padding (el, opts, state)
+function M.layout_element.padding (el, conf, state)
     local lines = 0
     if type(el.val) == "function" then lines = el.val() end
     if type(el.val) == "number" then lines = el.val end
@@ -160,7 +158,7 @@ function M.layout_element.padding (el, opts, state)
     return val, {}
 end
 
-function M.layout_element.button (el, opts, state)
+function M.layout_element.button (el, conf, state)
     local val = {}
     local hl = {}
     local padding = {
@@ -186,9 +184,9 @@ function M.layout_element.button (el, opts, state)
     end
 
     -- margin
-    if opts.opts and opts.opts.margin and el.opts and (el.opts.position ~= "center") then
+    if conf.opts and conf.opts.margin and el.opts and (el.opts.position ~= "center") then
         local left
-        val, left = M.pad_pargin(val, state, opts.opts.margin, if_nil(el.opts.shrink_margin, true))
+        val, left = M.pad_pargin(val, state, conf.opts.margin, if_nil(el.opts.shrink_margin, true))
         if el.opts.align_shortcut == "right"
             then padding.center = padding.center + left
             else padding.left = padding.left + left
@@ -232,19 +230,19 @@ function M.layout_element.button (el, opts, state)
     return val, hl
 end
 
-function M.layout_element.group (el, opts, state)
-    if type(el.val) == "function" then return M.resolve(M.layout_element.group, el, opts, state) end
+function M.layout_element.group (el, conf, state)
+    if type(el.val) == "function" then return M.resolve(M.layout_element.group, el, conf, state) end
 
     if type(el.val) == "table" then
         local text_tbl = {}
         local hl_tbl = {}
         for _, v in ipairs(el.val) do
-            local text, hl = M.layout_element[v.type](v, opts, state)
+            local text, hl = M.layout_element[v.type](v, conf, state)
             if text then list_extend(text_tbl, text) end
             if hl then list_extend(hl_tbl, hl) end
             if el.opts and el.opts.spacing then
                 local padding_el = {type = "padding", val = el.opts.spacing}
-                local text_1, hl_1 = M.layout_element[padding_el.type](padding_el, opts, state)
+                local text_1, hl_1 = M.layout_element[padding_el.type](padding_el, conf, state)
                 list_extend(text_tbl, text_1)
                 list_extend(hl_tbl, hl_1)
             end
@@ -253,13 +251,13 @@ function M.layout_element.group (el, opts, state)
     end
 end
 
-function M.layout(opts, state)
+function M.layout(conf, state)
     -- this is my way of hacking pattern matching
     -- you index the table by its "type"
     local hl = {}
     local text = {}
-    for _, el in ipairs(opts.layout) do
-        local text_el, hl_el = M.layout_element[el.type](el, opts, state)
+    for _, el in ipairs(conf.layout) do
+        local text_el, hl_el = M.layout_element[el.type](el, conf, state)
         list_extend(text, text_el)
         list_extend(hl, hl_el)
     end
@@ -274,26 +272,26 @@ M.keymaps_element = {}
 M.keymaps_element.text = noop
 M.keymaps_element.padding = noop
 
-function M.keymaps_element.button (el, opts, state)
+function M.keymaps_element.button (el, conf, state)
     if el.opts and el.opts.keymap then
         local map = el.opts.keymap
         vim.api.nvim_buf_set_keymap(state.buffer, map[1],map[2],map[3],map[4])
     end
 end
 
-function M.keymaps_element.group (el, opts, state)
-    if type(el.val) == "function" then M.resolve(M.keymaps_element.group, el, opts, state) end
+function M.keymaps_element.group (el, conf, state)
+    if type(el.val) == "function" then M.resolve(M.keymaps_element.group, el, conf, state) end
 
     if type(el.val) == "table" then
         for _, v in ipairs(el.val) do
-            M.keymaps_element[v.type](v, opts, state)
+            M.keymaps_element[v.type](v, conf, state)
         end
     end
 end
 
 function M.keymaps(opts, state)
     for _, el in ipairs(opts.layout) do
-        M.keymaps_element[el.type](el, opts, state)
+        M.keymaps_element[el.type](el, conf, state)
     end
 end
 
@@ -331,8 +329,8 @@ function M.closest_cursor_jump(cursor, cursors, prev_cursor)
     end
 end
 
-local function draw(name, opts, def_opts, state)
-    opts = opts or def_opts
+local function draw(name, conf, def_conf, state)
+    conf = conf or def_conf
     for k in ipairs(state.cursor_jumps) do state.cursor_jumps[k] = nil end
     for k in ipairs(state.cursor_jumps_press) do state.cursor_jumps_press[k] = nil end
     state.win_width = vim.api.nvim_win_get_width(state.window)
@@ -343,41 +341,60 @@ local function draw(name, opts, def_opts, state)
     local ix = state.cursor_ix
     vim.api.nvim_buf_set_option(state.buffer, "modifiable", true)
     vim.api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
-    M.layout(opts, state)
+    M.layout(conf, state)
     vim.api.nvim_buf_set_option(state.buffer, "modifiable", false)
-    vim.api.nvim_buf_set_keymap(
-    state.buffer,
-    "n",
-    "<CR>",
-    string.format(":call v:lua.gamma_ui.%s.press()<CR>", name),
-    {noremap = false, silent = true}
+    vim.keymap.set(
+        'n',
+        '<CR>',
+        function () M[name].press() end,
+        {remap = true, silent = true, buffer = state.buffer}
     )
     vim.api.nvim_win_set_cursor(state.window, state.cursor_jumps[ix])
 end
 
-local function enable(name, opts)
+local function enable(name, conf)
     -- vim.opt_local behaves inconsistently for window options, it seems.
     -- I don't have the patience to sort out a better way to do this
     -- or seperate out the buffer local options.
     vim.cmd (string.format([[
     silent! setlocal bufhidden=wipe nobuflisted colorcolumn= foldcolumn=0 matchpairs= nocursorcolumn nocursorline nolist nonumber norelativenumber nospell noswapfile signcolumn=no synmaxcol& buftype=nofile ft=%s nowrap
+    ]], name))
 
-    augroup gamma_ui_temp
-    au!
-    autocmd BufUnload <buffer> call v:lua.gamma_ui.%s.close()
-    autocmd CursorMoved <buffer> call v:lua.gamma_ui.%s.set_cursor()
-    augroup END
-    ]], name, name, name))
+    local augroup = name .. "_temp"
 
-    if opts.opts then
-        if if_nil(opts.opts.redraw_on_resize, true) then
-            vim.cmd (string.format([[
-            autocmd gamma_ui_temp VimResized * call v:lua.gamma_ui.%s.draw()
-            autocmd gamma_ui_temp BufLeave,WinEnter,WinNew,WinClosed * call v:lua.gamma_ui.%s.draw()
-            ]], name, name))
+    vim.api.nvim_create_augroup({ name = augroup, clear = true })
+
+    vim.api.nvim_create_autocmd {
+        group = augroup,
+        event = "BufUnload",
+        pattern = "<buffer>",
+        callback = function() M[name].close() end,
+    }
+
+    vim.api.nvim_create_autocmd {
+        group = augroup,
+        event = "CursorMoved",
+        pattern = "<buffer>",
+        callback = function() M[name].set_cursor() end,
+    }
+
+    if conf.opts then
+        if if_nil(conf.opts.redraw_on_resize, true) then
+            vim.api.nvim_create_autocmd {
+                group = augroup,
+                event = "VimResized",
+                pattern = "*",
+                callback = function() M[name].draw() end,
+            }
+            vim.api.nvim_create_autocmd {
+                group = augroup,
+                event = "BufLeave,WinEnter,WinNew,WinClosed",
+                pattern = "*",
+                callback = function() M[name].draw() end,
+            }
         end
 
-        if opts.opts.setup then opts.opts.setup() end
+        if conf.opts.setup then conf.opts.setup() end
     end
 end
 
@@ -394,19 +411,19 @@ function M.register_ui(name, state)
     local ui_mod = {}
     ui_mod.set_cursor = function () set_cursor(state) end
     ui_mod.press = function () state.cursor_jumps_press[state.cursor_ix]() end
-    ui_mod.enable = function (opts)
-        options = options or opts
-        enable(name, opts)
+    ui_mod.enable = function (conf)
+        options = options or conf
+        enable(name, conf)
     end
-    ui_mod.draw = function (opts)
-        draw(name, opts, options, state)
-        M.keymaps(opts or options, state)
+    ui_mod.draw = function (conf)
+        draw(name, conf, options, state)
+        M.keymaps(conf or options, state)
     end
     ui_mod.close = function ()
-        vim.cmd[[au! gamma_ui_temp]]
-        _G.gamma_ui[name] = nil
+        vim.cmd('au! ' .. name .. '_temp')
+        M[name] = nil
     end
-    _G.gamma_ui[name] = ui_mod
+    M[name] = ui_mod
 end
 
 return M
